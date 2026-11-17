@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # JobTracker — Spring Boot Application Tracker API
 
 A production-grade, secure RESTful API built with **Spring Boot** and **Spring Security** to manage and track job applications with strict user ownership, JWT authentication, advanced search/filtering, pagination, and dashboard metrics.
@@ -306,3 +307,6 @@ npm test -- --run
 - Test files: **4 passed**
 - Total tests: **11 passed**
 
+=======
+# jobTracker
+>>>>>>> origin/main
