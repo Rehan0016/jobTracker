@@ -1,0 +1,36 @@
+# Build outputs
+target/
+*.jar
+*.war
+
+# Version control
+.git/
+.gitignore
+
+# IDE and Editor configuration
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# Environment and local credentials
+.env
+.env.local
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Maven wrapper and local scripts (builder container uses bundled Maven)
+.mvn/
+mvnw
+mvnw.cmd
+
+# Documentation and Docker assets
+README.md
+Dockerfile
+.dockerignore
