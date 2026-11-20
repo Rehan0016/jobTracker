@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # JobTracker — Spring Boot Application Tracker API
 
 A production-grade, secure RESTful API built with **Spring Boot** and **Spring Security** to manage and track job applications with strict user ownership, JWT authentication, advanced search/filtering, pagination, and dashboard metrics.
@@ -10,21 +9,22 @@ A production-grade, secure RESTful API built with **Spring Boot** and **Spring S
 - **User Authentication**: Secure user registration and login with BCrypt password hashing and signed JWT (JSON Web Tokens).
 - **Strict User Ownership**: Multi-tenant data isolation enforced at the database query level. Users can never view, mutate, or delete another user's records (returns HTTP 404 to avoid disclosing existence).
 - **Job Application Management**: Comprehensive CRUD operations for tracking job applications.
-- **Search & Filtering**: Multi-field search across company name and job title, and filtering by `ApplicationStatus` (`APPLIED`, `INTERVIEW`, `OFFER`, `REJECTED`, `SELECTED`).
-- **Pagination & Sorting**: Efficient pagination and sorting backed by Spring Data JPA `Pageable` and SQL `LIMIT`/`OFFSET` queries.
+- **Search & Filtering**: Multi-field search across company name and job title, and filtering by `ApplicationStatus` (`APPLIED`, `ASSESSMENT`, `INTERVIEW`, `OFFER`, `REJECTED`, `SELECTED`, `WITHDRAWN`).
+- **Pagination & Sorting**: Efficient pagination and sorting backed by Spring Data JPA `Pageable` and SQL queries.
 - **Dashboard Analytics**: Real-time aggregated statistics categorized by application status, strictly isolated per user.
 - **Robust Exception Handling**: Centralized `@RestControllerAdvice` delivering consistent, structured JSON error responses with field-level validation feedback.
 - **Profile-Based Configuration**: Separate configurations for local development (`dev`) and production (`prod`).
+- **PostgreSQL / Supabase Integration**: Production-ready connection pooling optimized for Supabase's transaction pooler with SSL.
 
 ---
 
 ## Tech Stack
 
 - **Java**: 17
-- **Framework**: Spring Boot 4
-- **Security**: Spring Security 7, JJWT (io.jsonwebtoken 0.12.6), BCrypt
+- **Framework**: Spring Boot 3.4.2
+- **Security**: Spring Security 6, JJWT (io.jsonwebtoken 0.12.6), BCrypt
 - **Persistence**: Spring Data JPA, Hibernate 6, HikariCP
-- **Databases**: MySQL (runtime), H2 (in-memory testing)
+- **Databases**: PostgreSQL (Supabase runtime), H2 (in-memory testing)
 - **Build Tool**: Maven (`mvnw`)
 
 ---
@@ -37,17 +37,17 @@ The application uses profile-based configuration and reads sensitive credentials
 
 | Variable | Description | Development Default | Production Default |
 | :--- | :--- | :--- | :--- |
-| `SPRING_PROFILES_ACTIVE` | Active Spring profile | `dev` | Must be set to `prod` |
-| `SERVER_PORT` / `PORT` | HTTP port | `8080` | `8080` |
-| `DB_HOST` | MySQL hostname | `localhost` | *(Required)* |
-| `DB_PORT` | MySQL container/local port | `3306` | `3306` |
-| `DB_HOST_PORT` | Docker host-mapped MySQL port | `3307` | `3307` |
-| `DB_NAME` | MySQL database name | `jobtracker` | *(Required)* |
-| `DB_USERNAME` | MySQL database username | `root` | *(Required)* |
-| `DB_PASSWORD` | MySQL database password | *(None)* | *(Required)* |
-| `JWT_SECRET` | 256-bit Hex JWT Secret Key | Provided via `.env` | *(Required, minimum 64 hex characters)* |
+| `SPRING_PROFILES_ACTIVE` | Active Spring profile | `dev` | `prod` *(Required on Render)* |
+| `SERVER_PORT` / `PORT` | HTTP port | `8080` | Render assigns `$PORT` automatically |
+| `SPRING_DATASOURCE_URL` | PostgreSQL JDBC connection URL | `jdbc:postgresql://localhost:5432/jobtracker` | `jdbc:postgresql://aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres?sslmode=require` |
+| `SPRING_DATASOURCE_USERNAME` | PostgreSQL database username | `postgres` | `postgres.hmeufaqxjfjgjjcipsee` |
+| `SPRING_DATASOURCE_PASSWORD` | PostgreSQL database password | *(None)* | *(Required, set in Render)* |
+| `SPRING_JPA_HIBERNATE_DDL_AUTO` | Hibernate schema action | `update` | `update` |
+| `DB_POOL_MAX` | HikariCP max pool size | *(default)* | `5` (optimized for Supabase pooler) |
+| `DB_POOL_MIN` | HikariCP min idle connections | *(default)* | `1` |
+| `JWT_SECRET` | 256-bit Hex JWT Secret Key | Development fallback | *(Required, minimum 64 hex characters)* |
 | `JWT_EXPIRATION` | JWT token lifetime (ms) | `86400000` (24h) | `86400000` |
-| `CORS_ALLOWED_ORIGINS` | Allowed frontend origins | `http://localhost:3000,http://localhost:5173` | *(Configured per deployment)* |
+| `CORS_ALLOWED_ORIGINS` | Allowed frontend origins | `http://localhost:3000,http://localhost:5173` | Configured per frontend deployment URL |
 
 ---
 
@@ -57,34 +57,27 @@ The application uses profile-based configuration and reads sensitive credentials
 
 The `dev` profile enables automatic schema updates (`ddl-auto=update`), debug SQL logs, and local development endpoints.
 
-1. Ensure MySQL is running on your machine with database `jobtracker`:
-   ```sql
-   CREATE DATABASE IF NOT EXISTS jobtracker;
-   ```
-2. Set your local environment variables (PowerShell example):
+1. Ensure PostgreSQL is running locally or specify connection variables in `.env`:
    ```powershell
    $env:SPRING_PROFILES_ACTIVE="dev"
-   $env:DB_USERNAME="root"
-   $env:DB_PASSWORD="your_password"
+   $env:SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/jobtracker"
+   $env:SPRING_DATASOURCE_USERNAME="postgres"
+   $env:SPRING_DATASOURCE_PASSWORD="your_postgres_password"
    $env:JWT_SECRET="404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970"
    ```
-3. Run with Maven:
+2. Run with Maven:
    ```powershell
    .\mvnw.cmd spring-boot:run
-   ```
-   Or explicitly pass the profile:
-   ```powershell
-   .\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=dev
    ```
 
 ### 2. Production Profile (`prod`)
 
-The `prod` profile enforces strict production safeguards:
-- **`ddl-auto=validate`**: Hibernate will never alter or drop production tables.
-- **HikariCP Connection Pool**: Configured pool limits (`DB_POOL_MAX`, `DB_POOL_MIN`, timeouts).
-- **Secure Logging**: SQL and verbose security logging are suppressed; logs are formatted for production ingestion.
-- **SSL**: Enforces `useSSL=true` on MySQL connections.
-- **No Hardcoded Secrets**: Fails fast if `DB_PASSWORD`, `DB_HOST`, or `JWT_SECRET` are missing.
+The `prod` profile connects to Supabase PostgreSQL with SSL:
+- **`ddl-auto=update`**: Automatically creates and updates tables (`users`, `job_applications`), foreign keys, and indexes on fresh Supabase databases.
+- **HikariCP Connection Pool**: Connection pool sized to match Supabase pooler limits (`DB_POOL_MAX=5`).
+- **Secure Logging**: SQL and verbose security logging suppressed.
+- **SSL**: Enforces `sslmode=require` for secure cloud transport.
+- **No Hardcoded Secrets**: Reads database credentials and JWT secrets strictly from environment variables.
 
 To package and run in production:
 
@@ -95,16 +88,39 @@ To package and run in production:
 2. Execute the JAR with `prod` profile:
    ```bash
    export SPRING_PROFILES_ACTIVE=prod
-   export DB_HOST=your-mysql-host
-   export DB_PORT=3306
-   export DB_NAME=jobtracker_prod
-   export DB_USERNAME=app_user
-   export DB_PASSWORD=your_secure_password
-   export JWT_SECRET=your_production_64_hex_character_key
-   export CORS_ALLOWED_ORIGINS=https://jobtracker.yourdomain.com
+   export SPRING_DATASOURCE_URL="jdbc:postgresql://aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres?sslmode=require"
+   export SPRING_DATASOURCE_USERNAME="postgres.hmeufaqxjfjgjjcipsee"
+   export SPRING_DATASOURCE_PASSWORD="your_supabase_password"
+   export JWT_SECRET="your_production_64_hex_character_key"
+   export CORS_ALLOWED_ORIGINS="https://jobtracker.yourdomain.com"
 
    java -jar target/jobtracker-0.0.1-SNAPSHOT.jar
    ```
+
+---
+
+## Deploying to Render
+
+### Step 1: Create a Web Service on Render
+1. Link your GitHub repository in the [Render Dashboard](https://dashboard.render.com).
+2. Choose **Web Service**.
+3. Select **Docker** as the Runtime (or **Java** with build command `./mvnw clean package -DskipTests` and start command `java -jar target/jobtracker-0.0.1-SNAPSHOT.jar`).
+
+### Step 2: Configure Environment Variables in Render
+Under the **Environment** tab on Render, add these variables:
+
+| Key | Value |
+| :--- | :--- |
+| `SPRING_PROFILES_ACTIVE` | `prod` |
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres?sslmode=require` |
+| `SPRING_DATASOURCE_USERNAME` | `postgres.hmeufaqxjfjgjjcipsee` |
+| `SPRING_DATASOURCE_PASSWORD` | `<your-actual-supabase-password>` |
+| `SPRING_JPA_HIBERNATE_DDL_AUTO` | `update` |
+| `JWT_SECRET` | `<your-secure-64-character-hex-secret>` |
+| `JWT_EXPIRATION` | `86400000` |
+| `CORS_ALLOWED_ORIGINS` | `https://your-frontend-service.onrender.com` |
+
+> Render automatically sets the `PORT` environment variable (e.g., 10000), which `server.port=${PORT:${SERVER_PORT:8080}}` binds to dynamically.
 
 ---
 
@@ -118,85 +134,61 @@ The backend includes a production-ready, multi-stage [`Dockerfile`](Dockerfile) 
 - **Zero Hardcoded Secrets**: Secrets and database credentials must be provided as environment variables at container launch.
 - **Built-in Health Check**: Configured with `wget` checking `/api/health` every 30 seconds.
 
-### 1. Build the Docker Image
+---
 
-Run the following command from the project root:
+## Database Schema (PostgreSQL / Supabase)
 
-```bash
-docker build -t jobtracker-backend:latest .
-```
+The database schema is defined in [`src/main/resources/schema-postgres.sql`](src/main/resources/schema-postgres.sql).
 
-*Tip: To build without re-running tests inside Docker (e.g. if tests already ran in CI/CD):*
-```bash
-docker build --build-arg SKIP_TESTS=true -t jobtracker-backend:latest .
-```
+Hibernate automatically handles table creation and schema migration on startup when `SPRING_JPA_HIBERNATE_DDL_AUTO=update`. Alternatively, you can run the SQL directly in the Supabase SQL Editor:
 
-### 2. Run the Container
+```sql
+-- Users Table
+CREATE TABLE IF NOT EXISTS users (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(50) NOT NULL CHECK (role IN ('USER', 'ADMIN')),
+    created_at TIMESTAMP(6) NOT NULL
+);
 
-Launch the container passing runtime configuration via environment variables:
+-- Job Applications Table
+CREATE TABLE IF NOT EXISTS job_applications (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    company_name VARCHAR(255) NOT NULL,
+    job_title VARCHAR(255) NOT NULL,
+    location VARCHAR(255) DEFAULT NULL,
+    job_url VARCHAR(255) DEFAULT NULL,
+    status VARCHAR(50) NOT NULL CHECK (status IN ('APPLIED', 'ASSESSMENT', 'INTERVIEW', 'OFFER', 'REJECTED', 'SELECTED', 'WITHDRAWN')),
+    application_date DATE DEFAULT NULL,
+    notes VARCHAR(2000) DEFAULT NULL,
+    job_description VARCHAR(4000) DEFAULT NULL,
+    deadline DATE DEFAULT NULL,
+    user_id BIGINT DEFAULT NULL,
+    CONSTRAINT fk_job_applications_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
 
-```bash
-docker run -d \
-  --name jobtracker-api \
-  -p 8080:8080 \
-  -e SPRING_PROFILES_ACTIVE=prod \
-  -e DB_HOST=host.docker.internal \
-  -e DB_PORT=3306 \
-  -e DB_NAME=jobtracker \
-  -e DB_USERNAME=root \
-  -e DB_PASSWORD=your_secure_password \
-  -e JWT_SECRET=your_64_character_hex_jwt_secret_key_here \
-  -e CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173 \
-  jobtracker-backend:latest
-```
-
-Alternatively, supply the environment file:
-
-```bash
-docker run -d \
-  --name jobtracker-api \
-  -p 8080:8080 \
-  --env-file .env \
-  jobtracker-backend:latest
-```
-
-### 3. Check Container Health & Logs
-
-```bash
-# View live application logs
-docker logs -f jobtracker-api
-
-# Inspect container health status
-docker inspect --format='{{json .State.Health.Status}}' jobtracker-api
+CREATE INDEX IF NOT EXISTS idx_job_applications_status ON job_applications (status);
+CREATE INDEX IF NOT EXISTS idx_job_applications_user_id ON job_applications (user_id);
 ```
 
 ---
 
-## Running the Test Suite
+## REST API Specification
 
-The test suite runs entirely isolated using an in-memory H2 database, requiring no running MySQL instance.
-
-```powershell
-.\mvnw.cmd test
-```
-
-All 91 unit and integration tests (including security filter chains, authentication flows, and multi-user ownership isolation) are executed automatically.
-
----
-
-## API Endpoints Overview
-
-### Authentication (`/api/auth`)
+### Authentication Endpoints (`/api/auth`)
 | Method | Endpoint | Description | Public |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/auth/register` | Register a new user | Yes |
-| `POST` | `/api/auth/login` | Login and obtain JWT token | Yes |
+| `POST` | `/api/auth/register` | Register a new user account | Yes |
+| `POST` | `/api/auth/login` | Authenticate and obtain JWT token | Yes |
 
-### Job Applications (`/api/applications`) — *Requires Bearer Token*
+### Job Application Endpoints (`/api/applications`)
+All endpoints require `Authorization: Bearer <token>`:
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `POST` | `/api/applications` | Create job application (auto-bound to user) |
-| `GET` | `/api/applications` | List current user's applications |
+| `POST` | `/api/applications` | Create a new job application |
+| `GET` | `/api/applications` | List all applications for current user |
 | `GET` | `/api/applications/{id}` | Get application by ID (404 if not owner) |
 | `PUT` | `/api/applications/{id}` | Update application (404 if not owner) |
 | `DELETE` | `/api/applications/{id}` | Delete application (404 if not owner) |
@@ -204,109 +196,20 @@ All 91 unit and integration tests (including security filter chains, authenticat
 | `GET` | `/api/applications/paged?page=0&size=10` | Paginated and sorted list of user's applications |
 | `GET` | `/api/applications/stats` | Dashboard metrics for current user |
 
-### Health Check (`/api/health`)
+### Health Check Endpoints
 | Method | Endpoint | Description | Public |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/health` | Service health status | Yes |
-
----
-
-## Docker Compose Full-Stack Infrastructure
-
-The project includes an enterprise-grade [`docker-compose.yml`](docker-compose.yml) orchestrating the complete full-stack environment:
-1. **MySQL 8.0**: Database with persistent named volume (`mysql_data`), custom health check (`mysqladmin ping`), and UTF-8 charset.
-2. **Spring Boot Backend**: Production profile, connecting via the internal bridge network (`jobtracker-network`), waiting for MySQL to be healthy before starting.
-3. **React + Nginx Frontend**: Production multi-stage build, serving static assets with SPA routing and proxying `/api/` traffic directly to the backend.
-
-### 1. Quick Start with Docker Compose
-
-1. Copy the example environment file:
-   ```bash
-   cp .env.example .env
-   ```
-2. Adjust credentials if needed in `.env` (do not commit `.env` to version control).
-3. Build and launch all services in detached mode:
-   ```bash
-   docker compose up --build -d
-   ```
-4. Verify all services are healthy and running:
-   ```bash
-   docker compose ps
-   ```
-5. Access the application:
-   - **Frontend Application**: [http://localhost:3000](http://localhost:3000)
-   - **Backend REST API**: [http://localhost:8081](http://localhost:8081)
-   - **Backend Health Check**: [http://localhost:8081/api/health](http://localhost:8081/api/health)
-
-### 2. Viewing Logs & Managing Containers
-
-```bash
-# View aggregated live logs
-docker compose logs -f
-
-# View backend logs specifically
-docker compose logs -f backend
-
-# Stop all containers (preserving database volume)
-docker compose down
-
-# Stop and wipe database volume (clean reset)
-docker compose down -v
-```
-
----
-
-## Frontend Application (React + Vite + TypeScript)
-
-The frontend is a modern, responsive Single Page Application (SPA) located in [`frontend/`](frontend).
-
-### Features & Design
-- **Tech Stack**: React, TypeScript, Vite, Tailwind CSS, Lucide icons, Axios, React Router.
-- **Modern SaaS Aesthetics**: Soft gradients, slate surfaces, crisp KPI cards, status badges, and refined typography.
-- **Authentication**: JWT token management, automatic Bearer request injection, session handling, 401 response interceptor, protected routes (`/dashboard`, `/applications`), and public routes (`/login`, `/register`).
-- **Interactive Dashboard**: Real-time KPI stat cards (`Total Applications`, `Applied`, `Interviews`, `Offers`, `Selected`, `Rejected`), visual pipeline distribution progress bar, and recent applications quick table.
-- **Full CRUD Applications Table**: Search by company and job title, status filter dropdown, column sorting (`companyName`, `jobTitle`, `applicationDate`), server-side pagination, and modal dialogs for create, edit, and deletion confirmation.
-- **Multi-Tenant Data Isolation**: Strictly scopes and renders data belonging exclusively to the authenticated user.
-
-### Running Frontend Locally
-
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Start development server (with Vite API proxy to backend on port 8080)
-npm run dev
-
-# Run Vitest test suite
-npm test -- --run
-
-# Build production bundle
-npm run build
-```
+| `GET` | `/api/db-health` | Database connection status | Yes |
 
 ---
 
 ## Testing Verification
 
 ### Backend Tests
-Execute the full Spring Boot test suite (91 automated tests):
+Execute the full Spring Boot test suite (112 automated tests):
 ```powershell
 .\mvnw.cmd test
 ```
-- Total tests: **91**
+- Total tests: **112**
 - Failures: **0**, Errors: **0**
-
-### Frontend Tests
-Execute the complete frontend test suite (11 automated tests covering auth flows, CRUD modals, dashboard metrics, and user isolation):
-```powershell
-cd frontend
-npm test -- --run
-```
-- Test files: **4 passed**
-- Total tests: **11 passed**
-
-=======
-# jobTracker
->>>>>>> origin/main
