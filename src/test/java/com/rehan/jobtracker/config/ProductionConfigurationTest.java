@@ -23,7 +23,7 @@ class ProductionConfigurationTest {
     }
 
     @Test
-    @DisplayName("application.properties defaults active profile to prod")
+    @DisplayName("application.properties defaults active profile to prod and sets base pooler username")
     void applicationPropertiesDefaultsToProdProfile() throws IOException {
         Properties props = PropertiesLoaderUtils.loadProperties(getMainResource("application.properties"));
         String activeProfile = props.getProperty("spring.profiles.active");
@@ -31,6 +31,11 @@ class ProductionConfigurationTest {
         assertNotNull(activeProfile);
         assertEquals("${SPRING_PROFILES_ACTIVE:prod}", activeProfile,
                 "Default active profile in application.properties must be prod");
+
+        String username = props.getProperty("spring.datasource.username");
+        assertNotNull(username, "Base application.properties must define datasource username");
+        assertEquals("${SPRING_DATASOURCE_USERNAME:postgres.hmeufaqxjfjgjjcipsee}", username,
+                "Base datasource username must default to postgres.hmeufaqxjfjgjjcipsee");
     }
 
     @Test
@@ -59,15 +64,27 @@ class ProductionConfigurationTest {
 
         assertEquals("org.postgresql.Driver", driver,
                 "Driver should be PostgreSQL");
-    }
-
-    @Test
-    @DisplayName("application-prod.properties has optimized pool settings for Supabase pooler")
-    void applicationProdPoolSettings() throws IOException {
-        Properties props = PropertiesLoaderUtils.loadProperties(getMainResource("application-prod.properties"));
 
         assertEquals("${DB_POOL_MAX:5}", props.getProperty("spring.datasource.hikari.maximum-pool-size"));
         assertEquals("${DB_POOL_MIN:1}", props.getProperty("spring.datasource.hikari.minimum-idle"));
         assertEquals("${SPRING_JPA_HIBERNATE_DDL_AUTO:update}", props.getProperty("spring.jpa.hibernate.ddl-auto"));
+    }
+
+    @Test
+    @DisplayName("Verify DataSourceProperties and HikariDataSource binding with prod profile")
+    void testDataSourcePropertiesBinding() {
+        org.springframework.boot.autoconfigure.jdbc.DataSourceProperties dsProps =
+                new org.springframework.boot.autoconfigure.jdbc.DataSourceProperties();
+        dsProps.setUrl("jdbc:postgresql://aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres?sslmode=require");
+        dsProps.setUsername("postgres.hmeufaqxjfjgjjcipsee");
+        dsProps.setPassword("dummy_pass");
+        dsProps.setDriverClassName("org.postgresql.Driver");
+
+        com.zaxxer.hikari.HikariDataSource ds = dsProps.initializeDataSourceBuilder()
+                .type(com.zaxxer.hikari.HikariDataSource.class)
+                .build();
+
+        assertEquals("postgres.hmeufaqxjfjgjjcipsee", ds.getUsername());
+        assertEquals("jdbc:postgresql://aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres?sslmode=require", ds.getJdbcUrl());
     }
 }
