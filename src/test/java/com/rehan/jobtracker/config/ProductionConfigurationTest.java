@@ -67,7 +67,7 @@ class ProductionConfigurationTest {
 
         assertEquals("${DB_POOL_MAX:5}", props.getProperty("spring.datasource.hikari.maximum-pool-size"));
         assertEquals("${DB_POOL_MIN:1}", props.getProperty("spring.datasource.hikari.minimum-idle"));
-        assertEquals("${SPRING_JPA_HIBERNATE_DDL_AUTO:update}", props.getProperty("spring.jpa.hibernate.ddl-auto"));
+        assertEquals("validate", props.getProperty("spring.jpa.hibernate.ddl-auto"));
     }
 
     @Test
