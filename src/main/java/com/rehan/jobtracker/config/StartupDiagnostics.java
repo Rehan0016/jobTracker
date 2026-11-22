@@ -122,9 +122,10 @@ public class StartupDiagnostics implements BeanPostProcessor, PriorityOrdered, E
         String envUser = environment.getProperty("spring.datasource.username");
         String effectiveUser = actualDataSourceUser != null ? actualDataSourceUser : envUser;
 
-        boolean passwordConfigured = environment.containsProperty("spring.datasource.password")
-                && environment.getProperty("spring.datasource.password") != null
-                && !environment.getProperty("spring.datasource.password").isBlank();
+        String rawPassword = environment.getProperty("spring.datasource.password");
+        boolean passwordConfigured = rawPassword != null && !rawPassword.isBlank();
+        int passwordLength = passwordConfigured ? rawPassword.length() : 0;
+        boolean looksLikeUrl = passwordConfigured && (rawPassword.startsWith("jdbc:") || rawPassword.startsWith("postgres://") || rawPassword.contains("://"));
 
         String usernameSource = determinePropertySource("spring.datasource.username");
 
@@ -135,7 +136,10 @@ public class StartupDiagnostics implements BeanPostProcessor, PriorityOrdered, E
         sb.append(String.format("Effective Datasource URL     : %s%n", sanitizedUrl != null ? sanitizedUrl : "(not set)"));
         sb.append(String.format("Effective Datasource Username: %s%n", effectiveUser != null ? effectiveUser : "(not set)"));
         sb.append(String.format("Username Configuration Source: %s%n", usernameSource));
-        sb.append(String.format("Database Password Configured : %s%n", passwordConfigured));
+        sb.append(String.format("Database Password Configured : %s (length: %d chars)%n", passwordConfigured, passwordLength));
+        if (looksLikeUrl) {
+            sb.append("WARNING                      : Database password appears to be a JDBC URL / connection string rather than a raw password!\n");
+        }
         sb.append(String.format("JWT Secret Configured        : %s%n", environment.containsProperty("jwt.secret")));
         sb.append("==================================================================");
 

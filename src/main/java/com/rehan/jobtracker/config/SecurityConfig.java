@@ -130,7 +130,7 @@ public class SecurityConfig {
 
         configuration.setAllowedOrigins(allowedOrigins);
         configuration.setAllowedMethods(
-                List.of("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
         );
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
