@@ -1,7 +1,24 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { ApiErrorResponse } from '../types/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+/**
+ * Normalizes the API base URL to ensure endpoints are routed correctly.
+ * - Local development defaults to '/api' (proxied by Vite to http://localhost:8080).
+ * - Production on Vercel uses VITE_API_BASE_URL (e.g. 'https://jobtracker-xys2.onrender.com/api').
+ * - Automatically ensures '/api' is present and prevents duplicate '/api/api' or trailing slashes.
+ */
+export function resolveApiBaseUrl(rawUrl?: string): string {
+  if (!rawUrl || rawUrl.trim() === '') {
+    return '/api';
+  }
+  const cleanUrl = rawUrl.trim().replace(/\/+$/, '');
+  if (/^https?:\/\//i.test(cleanUrl)) {
+    return cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`;
+  }
+  return cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
+}
+
+const API_BASE_URL = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
